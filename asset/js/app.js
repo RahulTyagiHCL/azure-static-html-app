@@ -62,3 +62,32 @@ $("#btnSubmit").on("click", function () {
 
     alert(JSON.stringify(finalJson, null, 2));
 });
+
+async function callAzureFunction() {
+    const output = document.getElementById("output");
+    output.textContent = "Loading...";
+
+    const functionUrl =
+        "https://msfoundry001-ancqf2fnedfrczf2.centralindia-01.azurewebsites.net/api/collabGovernance";
+
+    try {
+        const response = await fetch(functionUrl, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json"
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Pretty print JSON
+        output.textContent = JSON.stringify(data, null, 2);
+
+    } catch (error) {
+        output.textContent = "Error calling Azure Function:\n" + error.message;
+    }
+}
