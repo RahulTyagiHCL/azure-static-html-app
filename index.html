@@ -1,103 +1,1071 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Azure Static Web App</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DataIQ · M365 Data Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 
-    <!-- ✅ Bootstrap CSS -->
+<!--
+  ╔══════════════════════════════════════════════════════════════════╗
+  ║  DATAIQ – Microsoft Fabric Semantic Model Integration           ║
+  ║                                                                  ║
+  ║  Auth  : MSAL.js (Azure AD PKCE flow — no client secret)        ║
+  ║  API   : Power BI REST /executeQueries  (DAX over HTTPS)        ║
+  ║  Host  : Azure Static Web App                                    ║
+  ║                                                                  ║
+  ║  ► Replace the CONFIG block below with your own values           ║
+  ╚══════════════════════════════════════════════════════════════════╝
+-->
 
-     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
- 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<!-- MSAL 3.x from CDN -->
+<script src="https://alcdn.msauth.net/browser/3.7.1/js/msal-browser.min.js"></script>
 
-<!-- ✅ D3.js -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 
-<!-- Your existing app logic -->
+:root {
+  --bg:#0C1117; --surface:#161b27; --surface2:#1a2035; --border:#1e2840;
+  --muted:#8892a4; --dim:#4a5568; --text:#E8EAF0; --text2:#C8D0DC;
+  --blue:#0078D4; --purple:#6264A7; --violet:#7B4FD4;
+  --teal:#4ECDC4; --orange:#FFB347; --red:#FF4D6D; --navy:#0364B8;
+}
 
+html { scroll-behavior:smooth; }
+body {
+  background:var(--bg); color:var(--text);
+  font-family:'DM Sans',sans-serif; min-height:100vh;
+  padding:24px; line-height:1.5;
+}
 
-<!-- ✅ D3 chart logic -->
-<script src="d3-chart.js"></script>
+::-webkit-scrollbar { width:4px; height:4px; }
+::-webkit-scrollbar-track { background:var(--bg); }
+::-webkit-scrollbar-thumb { background:#2a3450; border-radius:4px; }
 
+@keyframes fadeUp   { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+@keyframes pulse    { 0%,100%{opacity:1} 50%{opacity:.35} }
+@keyframes barGrow  { from{width:0} }
+@keyframes gaugeSpin{ from{stroke-dasharray:0 1000} }
+@keyframes spin     { to{transform:rotate(360deg)} }
 
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    >
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+.fade   { animation:fadeUp .5s ease both; }
+.fade-1 { animation-delay:.06s; } .fade-2 { animation-delay:.12s; }
+.fade-3 { animation-delay:.18s; } .fade-4 { animation-delay:.24s; }
+.fade-5 { animation-delay:.30s; } .fade-6 { animation-delay:.36s; }
+.fade-7 { animation-delay:.42s; } .fade-8 { animation-delay:.48s; }
+
+/* ── AUTH BANNER ── */
+#auth-banner {
+  display:flex; align-items:center; justify-content:space-between;
+  background:linear-gradient(90deg,#0078D411,#6264A711);
+  border:1px solid #0078D433; border-radius:12px;
+  padding:14px 20px; margin-bottom:20px;
+  font-family:'DM Mono',monospace; font-size:12px; color:var(--muted);
+  animation:fadeUp .4s ease both;
+}
+#auth-banner .auth-left { display:flex; align-items:center; gap:10px; }
+#auth-status-dot { width:8px; height:8px; border-radius:50%; background:var(--dim); flex-shrink:0; }
+#auth-status-dot.connected { background:var(--teal); box-shadow:0 0 8px var(--teal); animation:pulse 2s infinite; }
+#auth-status-dot.error     { background:var(--red);  box-shadow:0 0 8px var(--red); }
+#auth-user   { color:var(--text); font-size:12px; }
+.btn-auth {
+  padding:7px 18px; border-radius:8px; border:none; cursor:pointer;
+  font-family:'DM Mono',monospace; font-size:11px; font-weight:600;
+  transition:opacity .2s, transform .15s; letter-spacing:.5px;
+}
+.btn-auth:hover { opacity:.85; transform:translateY(-1px); }
+.btn-signin  { background:var(--blue);   color:#fff; }
+.btn-signout { background:#1e2840;       color:var(--muted); }
+.btn-refresh {
+  background:#1e2840; color:var(--teal); border:1px solid #4ECDC444;
+  padding:7px 14px; border-radius:8px; cursor:pointer;
+  font-family:'DM Mono',monospace; font-size:11px; letter-spacing:.5px;
+  transition:opacity .2s;
+}
+.btn-refresh:hover { opacity:.75; }
+.btn-refresh:disabled { opacity:.4; cursor:default; }
+
+/* ── SKELETON / SPINNER ── */
+.skeleton {
+  background:linear-gradient(90deg,#1e2840 25%,#263050 50%,#1e2840 75%);
+  background-size:200% 100%; animation:shimmer 1.4s infinite;
+  border-radius:6px;
+}
+@keyframes shimmer { to{background-position:-200% 0} }
+.spinner {
+  width:14px; height:14px; border:2px solid #2a3450;
+  border-top-color:var(--teal); border-radius:50%;
+  animation:spin .7s linear infinite; display:inline-block;
+}
+
+/* ── ERROR TOAST ── */
+#toast {
+  position:fixed; bottom:24px; right:24px;
+  background:#1a1020; border:1px solid var(--red);
+  color:var(--red); font-family:'DM Mono',monospace; font-size:12px;
+  padding:12px 18px; border-radius:10px; z-index:999;
+  display:none; max-width:360px; line-height:1.5;
+  box-shadow:0 8px 32px #00000088;
+}
+
+/* ── HEADER ── */
+.header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:28px; }
+.logo-row { display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+.logo-icon {
+  width:36px; height:36px; border-radius:10px;
+  background:linear-gradient(135deg,var(--blue),var(--purple));
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Syne',sans-serif; font-weight:800; font-size:13px; color:#fff;
+}
+.logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:22px; letter-spacing:-.5px; }
+.logo-text span { color:var(--blue); }
+.badge {
+  font-size:10px; color:var(--muted); background:var(--surface2);
+  border:1px solid var(--border); border-radius:20px; padding:2px 10px;
+  font-family:'DM Mono',monospace;
+}
+.header-sub { color:var(--muted); font-size:12px; font-family:'DM Mono',monospace; }
+.header-sub em { color:var(--teal); font-style:normal; }
+.live-row { display:flex; align-items:center; gap:8px; }
+.live-dot { width:8px; height:8px; border-radius:50%; background:var(--teal); animation:pulse 2s infinite; box-shadow:0 0 8px var(--teal); }
+.live-label { font-size:12px; color:var(--teal); font-family:'DM Mono',monospace; }
+
+/* ── METRICS ── */
+.metrics-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-bottom:20px; }
+.metric-card {
+  background:linear-gradient(135deg,var(--surface) 0%,var(--surface2) 100%);
+  border-radius:14px; padding:20px 20px 18px;
+  position:relative; overflow:hidden; border:1px solid var(--border);
+  transition:transform .2s, box-shadow .2s;
+}
+.metric-card:hover { transform:translateY(-2px); box-shadow:0 8px 32px #00000055; }
+.metric-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent-color),transparent);
+}
+.metric-card::after {
+  content:''; position:absolute; bottom:-24px; right:-24px;
+  width:80px; height:80px; border-radius:50%;
+  background:color-mix(in srgb,var(--accent-color) 12%,transparent);
+}
+.metric-label { color:var(--muted); font-size:10px; font-family:'DM Mono',monospace; letter-spacing:2px; text-transform:uppercase; margin-bottom:8px; }
+.metric-value { color:var(--text); font-size:30px; font-weight:700; font-family:'Syne',sans-serif; line-height:1; min-height:36px; }
+.metric-sub { font-size:11px; font-family:'DM Mono',monospace; margin-top:6px; color:var(--accent-color); }
+
+/* ── MAIN GRID ── */
+.main-grid { display:grid; grid-template-columns:220px 1fr; gap:16px; margin-bottom:16px; }
+
+/* ── SERVICE NAV ── */
+.service-nav {
+  background:linear-gradient(180deg,var(--surface) 0%,#131720 100%);
+  border:1px solid var(--border); border-radius:14px; padding:14px 10px;
+}
+.nav-label { font-size:10px; color:var(--muted); font-family:'DM Mono',monospace; letter-spacing:2px; padding:0 8px; margin-bottom:10px; display:block; }
+.srv-btn {
+  width:100%; display:flex; align-items:center; gap:10px;
+  padding:10px; border-radius:10px; border:none; cursor:pointer;
+  background:transparent; margin-bottom:2px; transition:background .2s; text-align:left;
+}
+.srv-btn:hover { background:var(--surface2); }
+.srv-btn.active { background:var(--border); }
+.srv-icon {
+  width:30px; height:30px; border-radius:8px; background:var(--border);
+  display:flex; align-items:center; justify-content:center;
+  font-size:9px; font-weight:700; color:var(--muted);
+  font-family:'DM Mono',monospace; flex-shrink:0; transition:background .2s,color .2s;
+}
+.srv-btn.active .srv-icon { color:#fff; }
+.srv-name  { font-size:12px; font-weight:600; color:var(--muted); transition:color .2s; }
+.srv-btn.active .srv-name { color:var(--text); }
+.srv-count { font-size:10px; font-family:'DM Mono',monospace; color:var(--dim); }
+
+.gauge-wrap { margin:16px 8px 8px; border-top:1px solid var(--border); padding-top:16px; }
+.gauge-section-label { font-size:10px; color:var(--muted); font-family:'DM Mono',monospace; letter-spacing:2px; margin-bottom:12px; display:block; }
+.gauge-center { display:flex; flex-direction:column; align-items:center; }
+.gauge-svg { transform:rotate(135deg); }
+.gauge-number { font-size:28px; font-weight:800; font-family:'Syne',sans-serif; margin-top:-90px; text-align:center; }
+.gauge-sub { font-size:9px; color:var(--muted); font-family:'DM Mono',monospace; letter-spacing:2px; margin-top:46px; text-align:center; }
+
+/* ── DETAIL ── */
+.detail-col { display:flex; flex-direction:column; gap:16px; }
+.service-detail {
+  background:linear-gradient(135deg,var(--surface) 0%,var(--surface2) 100%);
+  border-radius:14px; padding:20px 24px; border:1px solid var(--border);
+}
+.detail-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+.detail-title-row { display:flex; align-items:center; gap:12px; }
+.detail-icon {
+  width:44px; height:44px; border-radius:12px; display:flex;
+  align-items:center; justify-content:center;
+  font-size:12px; font-weight:700; color:#fff; font-family:'DM Mono',monospace;
+}
+.detail-title   { font-size:18px; font-weight:700; font-family:'Syne',sans-serif; }
+.detail-storage { font-size:12px; color:var(--muted); font-family:'DM Mono',monospace; }
+.trend-badge    { padding:5px 14px; border-radius:20px; font-size:12px; font-family:'DM Mono',monospace; font-weight:600; }
+.trend-up   { background:#FF4D6D22; color:var(--red); }
+.trend-down { background:#4ECDC422; color:var(--teal); }
+
+.kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+.kpi-box  { background:var(--bg); border-radius:10px; padding:14px 16px; border:1px solid var(--border); }
+.kpi-label { font-size:9px; color:var(--muted); font-family:'DM Mono',monospace; letter-spacing:1px; margin-bottom:6px; }
+.kpi-val   { font-size:24px; font-weight:700; font-family:'Syne',sans-serif; min-height:32px; }
+
+/* ── BAR CHART ── */
+.bar-chart-card { background:linear-gradient(135deg,var(--surface),var(--surface2)); border:1px solid var(--border); border-radius:14px; padding:20px 24px; }
+.section-label  { font-size:10px; color:var(--muted); font-family:'DM Mono',monospace; letter-spacing:2px; margin-bottom:16px; display:block; }
+.bar-row  { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+.bar-name { width:90px; font-size:12px; color:var(--muted); font-family:'DM Mono',monospace; flex-shrink:0; }
+.bar-track{ flex:1; height:5px; background:var(--border); border-radius:3px; overflow:hidden; }
+.bar-fill { height:100%; border-radius:3px; animation:barGrow .9s ease both; transition:width .7s ease; }
+.bar-val  { width:56px; font-size:12px; font-family:'DM Mono',monospace; text-align:right; flex-shrink:0; }
+.bar-pct  { width:34px; font-size:11px; color:var(--dim); font-family:'DM Mono',monospace; text-align:right; flex-shrink:0; }
+
+/* ── TABLE ── */
+.table-card { background:linear-gradient(135deg,var(--surface),var(--surface2)); border:1px solid var(--border); border-radius:14px; padding:20px 24px; }
+.table-header-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.view-all { font-size:11px; color:var(--blue); font-family:'DM Mono',monospace; cursor:pointer; text-decoration:none; }
+.view-all:hover { text-decoration:underline; }
+table { width:100%; border-collapse:collapse; }
+thead tr { border-bottom:1px solid var(--border); }
+th { text-align:left; padding:0 12px 10px; font-size:10px; color:var(--dim); font-family:'DM Mono',monospace; letter-spacing:1px; font-weight:500; }
+tbody tr { border-bottom:1px solid #161b27; transition:background .15s; cursor:pointer; }
+tbody tr:hover { background:var(--surface); }
+td { padding:12px; }
+.td-name { font-size:13px; color:var(--text2); font-weight:500; }
+.svc-tag  { font-size:11px; padding:3px 9px; border-radius:5px; font-family:'DM Mono',monospace; font-weight:500; }
+.td-meta  { font-size:12px; color:var(--muted); font-family:'DM Mono',monospace; }
+.risk-tag { font-size:11px; padding:3px 10px; border-radius:5px; font-family:'DM Mono',monospace; border:1px solid; }
+
+.footer { text-align:center; margin-top:24px; font-size:11px; color:#2a3450; font-family:'DM Mono',monospace; }
+
+/* ── CONFIG MODAL ── */
+#cfg-modal-bg {
+  display:none; position:fixed; inset:0; background:#00000099;
+  z-index:500; align-items:center; justify-content:center;
+}
+#cfg-modal-bg.open { display:flex; }
+#cfg-modal {
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:16px; padding:28px 32px; width:480px; max-width:95vw;
+  font-family:'DM Mono',monospace;
+}
+#cfg-modal h2 { font-family:'Syne',sans-serif; font-size:16px; margin-bottom:4px; color:var(--text); }
+#cfg-modal p  { font-size:11px; color:var(--muted); margin-bottom:20px; line-height:1.6; }
+.cfg-field { margin-bottom:14px; }
+.cfg-field label { display:block; font-size:10px; color:var(--muted); letter-spacing:1px; margin-bottom:6px; }
+.cfg-field input {
+  width:100%; background:var(--bg); border:1px solid var(--border);
+  border-radius:8px; padding:9px 12px; color:var(--text);
+  font-family:'DM Mono',monospace; font-size:12px; outline:none;
+  transition:border-color .2s;
+}
+.cfg-field input:focus { border-color:var(--blue); }
+.cfg-hint { font-size:10px; color:var(--dim); margin-top:4px; }
+.cfg-actions { display:flex; gap:10px; margin-top:20px; }
+.btn-cfg-save {
+  flex:1; padding:10px; background:var(--blue); color:#fff;
+  border:none; border-radius:8px; cursor:pointer; font-family:'DM Mono',monospace;
+  font-size:12px; font-weight:600; letter-spacing:.5px; transition:opacity .2s;
+}
+.btn-cfg-save:hover { opacity:.85; }
+.btn-cfg-cancel {
+  padding:10px 16px; background:var(--border); color:var(--muted);
+  border:none; border-radius:8px; cursor:pointer; font-family:'DM Mono',monospace;
+  font-size:12px; transition:opacity .2s;
+}
+.btn-cfg-cancel:hover { opacity:.75; }
+
+/* ── RESPONSIVE ── */
+@media(max-width:1200px){ .metrics-grid{grid-template-columns:repeat(3,1fr)} }
+@media(max-width:900px) { .main-grid{grid-template-columns:1fr} .kpi-grid{grid-template-columns:repeat(2,1fr)} }
+@media(max-width:600px) { .metrics-grid{grid-template-columns:repeat(2,1fr)} body{padding:12px} }
+</style>
 </head>
+<body>
 
-<body class="bg-light">
+<!-- ═══════════ CONFIG MODAL ═══════════ -->
+<div id="cfg-modal-bg">
+  <div id="cfg-modal">
+    <h2>Connect to Fabric Semantic Model</h2>
+    <p>Enter your Azure AD App Registration details and Fabric workspace info.<br>
+       All values are stored only in <code>sessionStorage</code> — never sent anywhere except Microsoft APIs.</p>
 
-<!-- HEADER -->
-<nav class="navbar navbar-dark bg-primary">
-    <div class="container">
-        <span class="navbar-brand fw-bold">Azure Static Web App Demo</span>
+    <div class="cfg-field">
+      <label>AZURE AD TENANT ID</label>
+      <input id="inp-tenant" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
     </div>
-</nav>
-
-<!-- CONTENT -->
-<div class="container mt-4">
-
-    <!-- INPUT FORM -->
-    <div class="card mb-4">
-        <div class="card-header fw-bold">Enter Values</div>
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <input type="text" id="txt1" class="form-control" placeholder="Textbox 1">
-                </div>
-                <div class="col-md-4">
-                    <input type="text" id="txt2" class="form-control" placeholder="Textbox 2">
-                </div>
-                <div class="col-md-4">
-                    <input type="text" id="txt3" class="form-control" placeholder="Textbox 3">
-                </div>
-            </div>
-            <button id="btnAdd" class="btn btn-success mt-3">Add to Grid</button>
-        </div>
+    <div class="cfg-field">
+      <label>APP REGISTRATION CLIENT ID</label>
+      <input id="inp-client" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+    </div>
+    <div class="cfg-field">
+      <label>POWER BI WORKSPACE (GROUP) ID</label>
+      <input id="inp-workspace" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+      <div class="cfg-hint">Found in the URL: app.powerbi.com/groups/<strong>{workspace-id}</strong></div>
+    </div>
+    <div class="cfg-field">
+      <label>FABRIC SEMANTIC MODEL (DATASET) ID</label>
+      <input id="inp-dataset" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+      <div class="cfg-hint">Found in the URL: app.powerbi.com/groups/.../datasets/<strong>{dataset-id}</strong></div>
     </div>
 
-    <!-- GRID -->
-    <table class="table table-bordered">
-        <thead class="table-dark">
-            <tr>
-                <th>Value 1</th>
-                <th>Value 2</th>
-                <th>Value 3</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody id="gridBody"></tbody>
-    </table>
-
-    <button id="btnSubmit" class="btn btn-primary">
-        Submit & Show JSON
-    </button>
+    <div class="cfg-actions">
+      <button class="btn-cfg-save" onclick="saveConfig()">Save &amp; Sign In →</button>
+      <button class="btn-cfg-cancel" onclick="closeCfgModal()">Use Demo Data</button>
+    </div>
+  </div>
 </div>
-   <hr class="my-5">
 
-    <h4 class="text-primary mb-3">Sample D3.js Visualization (Animated)</h4>
+<!-- ═══════════ ERROR TOAST ═══════════ -->
+<div id="toast"></div>
 
-    <div id="chartContainer" class="bg-white border p-3 rounded"></div>
+<!-- ═══════════ AUTH BANNER ═══════════ -->
+<div id="auth-banner">
+  <div class="auth-left">
+    <div id="auth-status-dot"></div>
+    <span id="auth-status-text">Not connected — using demo data</span>
+    <span id="auth-user"></span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn-refresh" id="btn-refresh" onclick="refreshData()" disabled title="Sign in to refresh">⟳ Refresh</button>
+    <button class="btn-auth btn-signin" id="btn-signin" onclick="openCfgModal()">Configure &amp; Sign In</button>
+    <button class="btn-auth btn-signout" id="btn-signout" onclick="signOut()" style="display:none">Sign Out</button>
+  </div>
+</div>
 
-    <button id="btnRedraw" class="btn btn-outline-primary mt-3">
-        Re‑Animate Chart
+<!-- ═══════════ HEADER ═══════════ -->
+<div class="header fade">
+  <div>
+    <div class="logo-row">
+      <div class="logo-icon">IQ</div>
+      <span class="logo-text">Data<span>IQ</span></span>
+      <span class="badge">M365</span>
+    </div>
+    <div class="header-sub">
+      Microsoft 365 · Data Hygiene Intelligence · Last refreshed: <em id="last-refresh">demo mode</em>
+    </div>
+  </div>
+  <div class="live-row">
+    <div class="live-dot"></div>
+    <span class="live-label" id="data-source-label">DEMO</span>
+  </div>
+</div>
+
+<!-- ═══════════ METRICS ═══════════ -->
+<div class="metrics-grid">
+  <div class="metric-card fade fade-1" style="--accent-color:#FFB347">
+    <div class="metric-label">Empty Files</div>
+    <div class="metric-value" id="m-empty">—</div>
+    <div class="metric-sub" id="m-empty-sub">Loading…</div>
+  </div>
+  <div class="metric-card fade fade-2" style="--accent-color:#FF4D6D">
+    <div class="metric-label">Stale Records</div>
+    <div class="metric-value" id="m-stale-records">—</div>
+    <div class="metric-sub" id="m-stale-records-sub">Loading…</div>
+  </div>
+  <div class="metric-card fade fade-3" style="--accent-color:#0078D4">
+    <div class="metric-label">Stale Sites</div>
+    <div class="metric-value" id="m-stale-sites">—</div>
+    <div class="metric-sub" id="m-stale-sites-sub">Loading…</div>
+  </div>
+  <div class="metric-card fade fade-4" style="--accent-color:#6264A7">
+    <div class="metric-label">Stale Groups</div>
+    <div class="metric-value" id="m-stale-groups">—</div>
+    <div class="metric-sub" id="m-stale-groups-sub">Loading…</div>
+  </div>
+  <div class="metric-card fade fade-5" style="--accent-color:#4ECDC4">
+    <div class="metric-label">Storage Wasted</div>
+    <div class="metric-value" id="m-storage">—</div>
+    <div class="metric-sub" id="m-storage-sub">Loading…</div>
+  </div>
+  <div class="metric-card fade fade-6" style="--accent-color:#FF4D6D">
+    <div class="metric-label">Total Issues</div>
+    <div class="metric-value" id="m-total">—</div>
+    <div class="metric-sub" id="m-total-sub">Loading…</div>
+  </div>
+</div>
+
+<!-- ═══════════ MAIN GRID ═══════════ -->
+<div class="main-grid">
+
+  <!-- SERVICE NAV -->
+  <div class="service-nav fade fade-2">
+    <span class="nav-label">SERVICES</span>
+
+    <button class="srv-btn active" onclick="selectService(this,'#0078D4')" data-service="sharepoint">
+      <div class="srv-icon" style="background:#0078D4;color:#fff">SP</div>
+      <div>
+        <div class="srv-name" style="color:var(--text)">SharePoint</div>
+        <div class="srv-count" id="sc-sharepoint" style="color:#0078D4">— issues</div>
+      </div>
+    </button>
+    <button class="srv-btn" onclick="selectService(this,'#0364B8')" data-service="onedrive">
+      <div class="srv-icon">OD</div>
+      <div>
+        <div class="srv-name">OneDrive</div>
+        <div class="srv-count" id="sc-onedrive">— issues</div>
+      </div>
+    </button>
+    <button class="srv-btn" onclick="selectService(this,'#6264A7')" data-service="teams">
+      <div class="srv-icon">TM</div>
+      <div>
+        <div class="srv-name">Teams</div>
+        <div class="srv-count" id="sc-teams">— issues</div>
+      </div>
+    </button>
+    <button class="srv-btn" onclick="selectService(this,'#0078D4')" data-service="exchange">
+      <div class="srv-icon">EX</div>
+      <div>
+        <div class="srv-name">Exchange Online</div>
+        <div class="srv-count" id="sc-exchange">— issues</div>
+      </div>
+    </button>
+    <button class="srv-btn" onclick="selectService(this,'#7B4FD4')" data-service="viva">
+      <div class="srv-icon">VE</div>
+      <div>
+        <div class="srv-name">Viva Engage</div>
+        <div class="srv-count" id="sc-viva">— issues</div>
+      </div>
     </button>
 
+    <!-- RISK GAUGE -->
+    <div class="gauge-wrap">
+      <span class="gauge-section-label">RISK SCORE</span>
+      <div class="gauge-center">
+        <svg class="gauge-svg" width="128" height="128" viewBox="0 0 128 128">
+          <circle cx="64" cy="64" r="52" fill="none" stroke="#1e2840" stroke-width="10"
+            stroke-dasharray="245.04 81.68" stroke-dashoffset="-40.84" stroke-linecap="round"/>
+          <circle id="gauge-fill" cx="64" cy="64" r="52" fill="none" stroke="#FF4D6D" stroke-width="10"
+            stroke-dasharray="0 326.72" stroke-dashoffset="-40.84" stroke-linecap="round"
+            style="filter:drop-shadow(0 0 7px #FF4D6D);transition:stroke-dasharray 1s ease"/>
+        </svg>
+        <div class="gauge-number" id="gauge-val" style="color:#FF4D6D">—</div>
+        <div class="gauge-sub">RISK SCORE</div>
+      </div>
+    </div>
+  </div>
 
-  <h2>Call Azure Function</h2>
+  <!-- DETAIL COLUMN -->
+  <div class="detail-col">
+    <div class="service-detail fade fade-3">
+      <div class="detail-header">
+        <div class="detail-title-row">
+          <div class="detail-icon" id="detail-icon" style="background:#0078D4;box-shadow:0 0 20px #0078D466">SP</div>
+          <div>
+            <div class="detail-title" id="detail-title">SharePoint</div>
+            <div class="detail-storage" id="detail-storage">— GB storage analyzed</div>
+          </div>
+        </div>
+        <div class="trend-badge trend-up" id="detail-trend">— vs last scan</div>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-box">
+          <div class="kpi-label">EMPTY FILES</div>
+          <div class="kpi-val" id="kpi-empty" style="color:#FFB347">—</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">STALE RECORDS</div>
+          <div class="kpi-val" id="kpi-records" style="color:#FF4D6D">—</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">STALE SITES</div>
+          <div class="kpi-val" id="kpi-sites" style="color:#0078D4">—</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">STALE GROUPS</div>
+          <div class="kpi-val" id="kpi-groups" style="color:#6264A7">—</div>
+        </div>
+      </div>
+    </div>
 
-    <button onclick="callAzureFunction()">Get Governance Data</button>
+    <!-- BAR CHART -->
+    <div class="bar-chart-card fade fade-4">
+      <span class="section-label">ISSUE DISTRIBUTION ACROSS SERVICES</span>
+      <div id="bar-chart-body">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+</div>
 
-    <pre id="output">Click the button to fetch data...</pre>
+<!-- ═══════════ TABLE ═══════════ -->
+<div class="table-card fade fade-6">
+  <div class="table-header-row">
+    <span class="section-label" style="margin-bottom:0">TOP STALE ITEMS</span>
+    <a class="view-all" href="#" onclick="return false">VIEW ALL →</a>
+  </div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>ITEM NAME</th><th>SERVICE</th><th>TYPE</th>
+          <th>LAST ACCESSED</th><th>SIZE</th><th>RISK</th>
+        </tr>
+      </thead>
+      <tbody id="stale-tbody">
+        <tr><td colspan="6" class="td-meta" style="text-align:center;padding:24px">
+          <span class="spinner"></span>&nbsp; Loading data…
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
-<!-- FOOTER -->
-<footer class="bg-dark text-white text-center p-3 mt-4">
-    © 2026 Azure Static Web App
-</footer>
-<script src="asset/js/app.js"></script>
+<div class="footer fade fade-8">
+  DataIQ · Microsoft Fabric Semantic Model · v3.0.0 · Azure AD PKCE
+</div>
 
+<!-- ═══════════════════════════════════════════════════════════
+     FABRIC INTEGRATION SCRIPT
+     ═══════════════════════════════════════════════════════════ -->
+<script>
+/* ─────────────────────────────────────────────────────────────
+   1.  CONFIGURATION  (loaded from sessionStorage or modal)
+   ─────────────────────────────────────────────────────────────
+
+   Populate these in the Config modal at runtime, or hard-code
+   for local testing:
+
+     TENANT_ID   : Azure AD Tenant ID
+     CLIENT_ID   : App Registration Client ID
+     WORKSPACE_ID: Power BI Workspace (Group) ID
+     DATASET_ID  : Fabric Semantic Model (Dataset) ID
+
+   Required App Registration settings:
+     ✔ Platform: Single-page application (SPA)
+     ✔ Redirect URI: https://<your-static-web-app>.azurestaticapps.net
+     ✔ API permissions: Power BI Service → Dataset.Read.All (delegated)
+     ✔ Allow public client flows: Yes
+     ✔ No client secret needed (PKCE flow)
+───────────────────────────────────────────────────────────── */
+
+let CFG = {
+  tenantId:    sessionStorage.getItem('diq_tenant')    || '',
+  clientId:    sessionStorage.getItem('diq_client')    || '',
+  workspaceId: sessionStorage.getItem('diq_workspace') || '',
+  datasetId:   sessionStorage.getItem('diq_dataset')   || '',
+};
+
+const SCOPES      = ['https://analysis.windows.net/powerbi/api/Dataset.Read.All'];
+const PBI_API     = 'https://api.powerbi.com/v1.0/myorg';
+
+/* ─────────────────────────────────────────────────────────────
+   2.  DAX QUERIES — map to your Fabric Semantic Model measures
+   
+   These assume your model has:
+     - A table [DataIQ] with:
+         [Service]          — "SharePoint" | "OneDrive" | "Teams" | "Exchange" | "Viva"
+         [IssueType]        — "EmptyFile" | "StaleRecord" | "StaleSite" | "StaleGroup"
+         [ItemName]         — string
+         [StorageGB]        — decimal
+         [LastAccessedDate] — date
+         [RiskLevel]        — "High" | "Medium" | "Low"
+         [ScanDate]         — date (most recent scan)
+
+   Edit the queries below to match YOUR actual table/column names.
+─────────────────────────────────────────────────────────────── */
+
+const DAX = {
+
+  // Top-level summary metrics
+  summary: `
+    EVALUATE
+    ROW(
+      "EmptyFiles",    CALCULATE(COUNTROWS(DataIQ), DataIQ[IssueType] = "EmptyFile"),
+      "StaleRecords",  CALCULATE(COUNTROWS(DataIQ), DataIQ[IssueType] = "StaleRecord"),
+      "StaleSites",    CALCULATE(COUNTROWS(DataIQ), DataIQ[IssueType] = "StaleSite"),
+      "StaleGroups",   CALCULATE(COUNTROWS(DataIQ), DataIQ[IssueType] = "StaleGroup"),
+      "StorageGB",     CALCULATE(SUM(DataIQ[StorageGB]), DataIQ[IssueType] <> ""),
+      "ScanDate",      FORMAT(MAX(DataIQ[ScanDate]), "dd MMM yyyy HH:mm")
+    )
+  `,
+
+  // Per-service breakdown
+  byService: `
+    EVALUATE
+    SUMMARIZECOLUMNS(
+      DataIQ[Service],
+      "EmptyFiles",   CALCULATE(COUNTROWS(DataIQ), DataIQ[IssueType] = "EmptyFile"),
+      "StaleRecords", CALCULATE(COUNTROWS(DataIQ), DataIQ[IssueType] = "StaleRecord"),
+      "StaleSites",   CALCULATE(COUNTROWS(DataIQ), DataIQ[IssueType] = "StaleSite"),
+      "StaleGroups",  CALCULATE(COUNTROWS(DataIQ), DataIQ[IssueType] = "StaleGroup"),
+      "StorageGB",    CALCULATE(SUM(DataIQ[StorageGB]))
+    )
+    ORDER BY DataIQ[Service]
+  `,
+
+  // Top 20 stale items for the table
+  staleItems: `
+    EVALUATE
+    TOPN(
+      20,
+      SELECTCOLUMNS(
+        FILTER(DataIQ, DataIQ[IssueType] <> "EmptyFile"),
+        "ItemName",    DataIQ[ItemName],
+        "Service",     DataIQ[Service],
+        "IssueType",   DataIQ[IssueType],
+        "LastAccessed",FORMAT(DataIQ[LastAccessedDate], "MMM YYYY"),
+        "StorageGB",   DataIQ[StorageGB],
+        "RiskLevel",   DataIQ[RiskLevel]
+      ),
+      [StorageGB], DESC
+    )
+    ORDER BY [RiskLevel], [StorageGB] DESC
+  `,
+};
+
+/* ─────────────────────────────────────────────────────────────
+   3.  MSAL SETUP
+─────────────────────────────────────────────────────────────── */
+
+let msalInstance = null;
+let accessToken  = null;
+let currentServiceData = {};
+let activeServiceKey   = 'sharepoint';
+
+function buildMsal() {
+  if (!CFG.tenantId || !CFG.clientId) return null;
+  return new msal.PublicClientApplication({
+    auth: {
+      clientId:    CFG.clientId,
+      authority:   `https://login.microsoftonline.com/${CFG.tenantId}`,
+      redirectUri: window.location.origin + window.location.pathname,
+    },
+    cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false },
+  });
+}
+
+async function initMsal() {
+  msalInstance = buildMsal();
+  if (!msalInstance) { loadDemoData(); return; }
+
+  await msalInstance.initialize();
+
+  // Handle redirect after login
+  const result = await msalInstance.handleRedirectPromise();
+  if (result) {
+    accessToken = result.accessToken;
+    onSignedIn(result.account);
+    return;
+  }
+
+  // Check existing session
+  const accounts = msalInstance.getAllAccounts();
+  if (accounts.length > 0) {
+    try {
+      const r = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
+      accessToken = r.accessToken;
+      onSignedIn(accounts[0]);
+    } catch { loadDemoData(); }
+  } else {
+    loadDemoData();
+  }
+}
+
+async function signIn() {
+  if (!msalInstance) { showToast('Configure your Azure AD details first.'); return; }
+  try {
+    await msalInstance.loginRedirect({ scopes: SCOPES });
+  } catch(e) { showToast('Sign-in failed: ' + e.message); }
+}
+
+function signOut() {
+  if (!msalInstance) return;
+  accessToken = null;
+  msalInstance.logoutRedirect();
+}
+
+function onSignedIn(account) {
+  document.getElementById('auth-status-dot').className = 'connected';
+  document.getElementById('auth-status-text').textContent = 'Connected to Fabric Semantic Model';
+  document.getElementById('auth-user').textContent = '· ' + (account.name || account.username);
+  document.getElementById('btn-signin').style.display   = 'none';
+  document.getElementById('btn-signout').style.display  = '';
+  document.getElementById('btn-refresh').disabled       = false;
+  document.getElementById('data-source-label').textContent = 'LIVE';
+  loadFabricData();
+}
+
+/* ─────────────────────────────────────────────────────────────
+   4.  DAX QUERY EXECUTION
+─────────────────────────────────────────────────────────────── */
+
+async function runDAX(daxQuery) {
+  if (!accessToken) throw new Error('Not authenticated');
+
+  const url = `${PBI_API}/groups/${CFG.workspaceId}/datasets/${CFG.datasetId}/executeQueries`;
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type':  'application/json',
+    },
+    body: JSON.stringify({
+      queries: [{ query: daxQuery.trim() }],
+      serializerSettings: { includeNulls: true },
+    }),
+  });
+
+  if (resp.status === 401) {
+    // Token expired — try silent refresh
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      const r = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
+      accessToken = r.accessToken;
+      return runDAX(daxQuery); // retry
+    }
+    throw new Error('Session expired. Please sign in again.');
+  }
+
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`DAX API error ${resp.status}: ${txt.slice(0,200)}`);
+  }
+
+  const json = await resp.json();
+  // Power BI REST returns: results[0].tables[0].rows[]
+  return json.results?.[0]?.tables?.[0]?.rows ?? [];
+}
+
+/* ─────────────────────────────────────────────────────────────
+   5.  DATA LOADING — Fabric path
+─────────────────────────────────────────────────────────────── */
+
+async function loadFabricData() {
+  setLoadingState(true);
+  try {
+    const [summaryRows, serviceRows, staleRows] = await Promise.all([
+      runDAX(DAX.summary),
+      runDAX(DAX.byService),
+      runDAX(DAX.staleItems),
+    ]);
+
+    renderSummary(summaryRows[0] || {});
+    renderServiceData(serviceRows);
+    renderStaleTable(staleRows);
+    renderBarChart(serviceRows);
+    updateLastRefresh(new Date());
+    document.getElementById('last-refresh').textContent = new Date().toLocaleTimeString();
+
+  } catch(e) {
+    showToast('Fabric query failed: ' + e.message);
+    setLoadingState(false);
+  }
+  setLoadingState(false);
+}
+
+async function refreshData() {
+  if (!accessToken) return;
+  await loadFabricData();
+}
+
+/* ─────────────────────────────────────────────────────────────
+   6.  DATA LOADING — Demo / fallback path
+─────────────────────────────────────────────────────────────── */
+
+const DEMO = {
+  summary: {
+    EmptyFiles: 1247, StaleRecords: 3821,
+    StaleSites: 94,   StaleGroups: 217,
+    StorageGB: 2458,  ScanDate: 'Demo Mode'
+  },
+  byService: [
+    { Service:'SharePoint', EmptyFiles:512,  StaleRecords:1240, StaleSites:62, StaleGroups:88,  StorageGB:980 },
+    { Service:'OneDrive',   EmptyFiles:389,  StaleRecords:870,  StaleSites:0,  StaleGroups:0,   StorageGB:620 },
+    { Service:'Exchange',   EmptyFiles:98,   StaleRecords:921,  StaleSites:0,  StaleGroups:29,  StorageGB:280 },
+    { Service:'Teams',      EmptyFiles:143,  StaleRecords:490,  StaleSites:14, StaleGroups:91,  StorageGB:340 },
+    { Service:'Viva',       EmptyFiles:105,  StaleRecords:300,  StaleSites:18, StaleGroups:9,   StorageGB:180 },
+  ],
+  staleItems: [
+    { ItemName:'Legacy Intranet Site',  Service:'SharePoint', IssueType:'StaleSite',   LastAccessed:'Feb 2024', StorageGB:42,   RiskLevel:'High'   },
+    { ItemName:'FY2021 Archive Group',  Service:'Teams',      IssueType:'StaleGroup',  LastAccessed:'Sep 2023', StorageGB:8,    RiskLevel:'High'   },
+    { ItemName:'Q1 Reports Folder',     Service:'OneDrive',   IssueType:'StaleRecord', LastAccessed:'May 2024', StorageGB:3.2,  RiskLevel:'Medium' },
+    { ItemName:'HR Shared Drive',       Service:'SharePoint', IssueType:'StaleSite',   LastAccessed:'Jul 2024', StorageGB:67,   RiskLevel:'Medium' },
+    { ItemName:'Project Phoenix Grp',   Service:'Teams',      IssueType:'StaleGroup',  LastAccessed:'May 2023', StorageGB:12,   RiskLevel:'High'   },
+    { ItemName:'Empty Mailbox Set',     Service:'Exchange',   IssueType:'StaleRecord', LastAccessed:'Dec 2023', StorageGB:0.1,  RiskLevel:'Low'    },
+    { ItemName:'Viva Community 2020',   Service:'Viva',       IssueType:'StaleGroup',  LastAccessed:'Jan 2023', StorageGB:2.1,  RiskLevel:'High'   },
+  ],
+};
+
+function loadDemoData() {
+  document.getElementById('data-source-label').textContent = 'DEMO';
+  document.getElementById('last-refresh').textContent = 'demo mode';
+  renderSummary(DEMO.summary);
+  renderServiceData(DEMO.byService);
+  renderStaleTable(DEMO.staleItems);
+  renderBarChart(DEMO.byService);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   7.  RENDER FUNCTIONS
+─────────────────────────────────────────────────────────────── */
+
+function renderSummary(row) {
+  // Power BI REST column names come back as "[TableName].[ColumnName]"
+  // or plain when using ROW(). We normalise both forms:
+  const get = (plain, aliased) => row[plain] ?? row[aliased] ?? 0;
+
+  const empty   = get('EmptyFiles',   '[EmptyFiles]');
+  const records = get('StaleRecords', '[StaleRecords]');
+  const sites   = get('StaleSites',   '[StaleSites]');
+  const groups  = get('StaleGroups',  '[StaleGroups]');
+  const storage = get('StorageGB',    '[StorageGB]');
+  const total   = empty + records + sites + groups;
+
+  setText('m-empty',          fmt(empty));
+  setText('m-stale-records',  fmt(records));
+  setText('m-stale-sites',    fmt(sites));
+  setText('m-stale-groups',   fmt(groups));
+  setText('m-storage',        fmtStorage(storage));
+  setText('m-total',          fmt(total));
+
+  setText('m-empty-sub',         `of ${fmt(total)} total issues`);
+  setText('m-stale-records-sub', `across all services`);
+  setText('m-stale-sites-sub',   sites === 0 ? 'No stale sites' : `Action required`);
+  setText('m-stale-groups-sub',  `Review recommended`);
+  setText('m-storage-sub',       `Recoverable`);
+  setText('m-total-sub',         row.ScanDate || row['[ScanDate]'] || '');
+
+  // Risk score: weighted formula (adjust to taste)
+  const risk = Math.min(100, Math.round(
+    (empty * 0.5 + records * 1 + sites * 5 + groups * 3) / Math.max(total, 1) * 10 +
+    Math.min(60, (total / 100))
+  ));
+  setGauge(risk);
+}
+
+function renderServiceData(rows) {
+  const serviceMap = {
+    SharePoint: 'sharepoint', OneDrive: 'onedrive',
+    Teams: 'teams', Exchange: 'exchange', 'Exchange Online': 'exchange',
+    Viva: 'viva', 'Viva Engage': 'viva',
+  };
+  const colorMap = { sharepoint:'#0078D4', onedrive:'#0364B8', teams:'#6264A7', exchange:'#0078D4', viva:'#7B4FD4' };
+  const iconMap  = { sharepoint:'SP', onedrive:'OD', teams:'TM', exchange:'EX', viva:'VE' };
+
+  currentServiceData = {};
+
+  rows.forEach(r => {
+    const svcRaw = r.Service || r['[Service]'] || r['DataIQ[Service]'] || '';
+    const key    = serviceMap[svcRaw] || svcRaw.toLowerCase();
+    if (!key) return;
+
+    const empty   = +(r.EmptyFiles   || r['[EmptyFiles]']   || 0);
+    const records = +(r.StaleRecords || r['[StaleRecords]'] || 0);
+    const sites   = +(r.StaleSites   || r['[StaleSites]']   || 0);
+    const groups  = +(r.StaleGroups  || r['[StaleGroups]']  || 0);
+    const storage = +(r.StorageGB    || r['[StorageGB]']    || 0);
+    const total   = empty + records + sites + groups;
+
+    currentServiceData[key] = { empty, records, sites, groups, storage, total,
+      icon: iconMap[key] || '??', color: colorMap[key] || '#888',
+      title: svcRaw, storageLabel: fmtStorage(storage) + ' storage analyzed',
+    };
+
+    const countEl = document.getElementById('sc-' + key);
+    if (countEl) { countEl.textContent = fmt(total) + ' issues'; countEl.style.color = colorMap[key] || ''; }
+  });
+
+  // Refresh active service detail panel
+  refreshDetailPanel(activeServiceKey);
+}
+
+function refreshDetailPanel(key) {
+  const svc = currentServiceData[key];
+  if (!svc) return;
+
+  document.getElementById('detail-icon').textContent   = svc.icon;
+  document.getElementById('detail-icon').style.background  = svc.color;
+  document.getElementById('detail-icon').style.boxShadow   = `0 0 20px ${svc.color}66`;
+  document.getElementById('detail-title').textContent   = svc.title;
+  document.getElementById('detail-storage').textContent = svc.storageLabel;
+  document.getElementById('kpi-empty').textContent      = fmt(svc.empty);
+  document.getElementById('kpi-records').textContent    = fmt(svc.records);
+  document.getElementById('kpi-sites').textContent      = fmt(svc.sites);
+  document.getElementById('kpi-groups').textContent     = fmt(svc.groups);
+  document.getElementById('detail-trend').textContent   = `${fmt(svc.total)} total issues`;
+}
+
+function renderBarChart(rows) {
+  const colorMap = { SharePoint:'#0078D4', OneDrive:'#0364B8', Teams:'#6264A7', Exchange:'#0078D4', 'Exchange Online':'#0078D4', Viva:'#7B4FD4', 'Viva Engage':'#7B4FD4' };
+  const totals   = rows.map(r => {
+    const svc = r.Service || r['[Service]'] || r['DataIQ[Service]'] || 'Unknown';
+    const val = (+(r.EmptyFiles||r['[EmptyFiles]']||0))
+              + (+(r.StaleRecords||r['[StaleRecords]']||0))
+              + (+(r.StaleSites||r['[StaleSites]']||0))
+              + (+(r.StaleGroups||r['[StaleGroups]']||0));
+    return { svc, val, color: colorMap[svc] || '#888' };
+  }).sort((a,b) => b.val - a.val);
+
+  const max   = totals[0]?.val || 1;
+  const grand = totals.reduce((s,t) => s+t.val, 0) || 1;
+
+  document.getElementById('bar-chart-body').innerHTML = totals.map((t, i) =>
+    `<div class="bar-row" style="${i===totals.length-1?'margin-bottom:0':''}">
+      <span class="bar-name">${t.svc.split(' ')[0]}</span>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${(t.val/max*100).toFixed(1)}%;background:${t.color};box-shadow:0 0 6px ${t.color}88;animation-delay:${i*0.1}s"></div>
+      </div>
+      <span class="bar-val" style="color:${t.color}">${fmt(t.val)}</span>
+      <span class="bar-pct">${Math.round(t.val/grand*100)}%</span>
+    </div>`
+  ).join('');
+}
+
+function renderStaleTable(rows) {
+  const svcColor = { SharePoint:'#0078D4', OneDrive:'#0364B8', Teams:'#6264A7', Exchange:'#0078D4', 'Exchange Online':'#0078D4', Viva:'#7B4FD4', 'Viva Engage':'#7B4FD4' };
+  const riskColor = { High:'#FF4D6D', Medium:'#FFB347', Low:'#4ECDC4' };
+
+  if (!rows.length) {
+    document.getElementById('stale-tbody').innerHTML =
+      '<tr><td colspan="6" class="td-meta" style="text-align:center;padding:24px">No stale items found.</td></tr>';
+    return;
+  }
+
+  document.getElementById('stale-tbody').innerHTML = rows.map(r => {
+    const name   = r.ItemName    || r['[ItemName]']    || '—';
+    const svc    = r.Service     || r['[Service]']     || '—';
+    const type   = (r.IssueType  || r['[IssueType]']  || '—').replace('Stale','').replace('Empty','Empty ');
+    const date   = r.LastAccessed|| r['[LastAccessed]']|| '—';
+    const gb     = +(r.StorageGB || r['[StorageGB]']   || 0);
+    const risk   = r.RiskLevel   || r['[RiskLevel]']   || 'Low';
+    const sc     = svcColor[svc]  || '#888';
+    const rc     = riskColor[risk]|| '#888';
+    return `<tr>
+      <td class="td-name">${esc(name)}</td>
+      <td><span class="svc-tag" style="color:${sc};background:${sc}18">${esc(svc)}</span></td>
+      <td class="td-meta">${esc(type)}</td>
+      <td class="td-meta">${esc(date)}</td>
+      <td class="td-meta">${gb < 1 ? (gb*1024).toFixed(0)+' MB' : gb.toFixed(1)+' GB'}</td>
+      <td><span class="risk-tag" style="color:${rc};border-color:${rc}44;background:${rc}18">${esc(risk)}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   8.  UI HELPERS
+─────────────────────────────────────────────────────────────── */
+
+function setGauge(score) {
+  const circ   = 2 * Math.PI * 52;
+  const filled = (score / 100) * circ * 0.75;
+  const color  = score > 70 ? '#FF4D6D' : score > 40 ? '#FFB347' : '#4ECDC4';
+  const fill   = document.getElementById('gauge-fill');
+  const num    = document.getElementById('gauge-val');
+  fill.setAttribute('stroke', color);
+  fill.style.filter = `drop-shadow(0 0 7px ${color})`;
+  fill.setAttribute('stroke-dasharray', `${filled} ${circ - filled}`);
+  num.textContent = score;
+  num.style.color = color;
+}
+
+function setLoadingState(loading) {
+  const btn = document.getElementById('btn-refresh');
+  btn.disabled   = loading;
+  btn.innerHTML  = loading ? '<span class="spinner"></span>' : '⟳ Refresh';
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function fmt(n) { return Number(n).toLocaleString(); }
+function fmtStorage(gb) {
+  if (gb >= 1024) return (gb/1024).toFixed(1) + ' TB';
+  return Math.round(gb) + ' GB';
+}
+function esc(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+function updateLastRefresh(d) {
+  document.getElementById('last-refresh').textContent =
+    d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+}
+
+function showToast(msg, duration = 6000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.display = 'none'; }, duration);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   9.  SERVICE SWITCHER
+─────────────────────────────────────────────────────────────── */
+
+function selectService(btn, color) {
+  document.querySelectorAll('.srv-btn').forEach(b => {
+    b.classList.remove('active');
+    b.querySelector('.srv-name').style.color = '';
+    const ic = b.querySelector('.srv-icon');
+    ic.style.background = '';
+    ic.style.color = '';
+  });
+  btn.classList.add('active');
+  btn.querySelector('.srv-name').style.color = 'var(--text)';
+  const ic = btn.querySelector('.srv-icon');
+  ic.style.background = color;
+  ic.style.color = '#fff';
+
+  activeServiceKey = btn.dataset.service;
+  refreshDetailPanel(activeServiceKey);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   10. CONFIG MODAL
+─────────────────────────────────────────────────────────────── */
+
+function openCfgModal() {
+  document.getElementById('inp-tenant').value    = CFG.tenantId;
+  document.getElementById('inp-client').value    = CFG.clientId;
+  document.getElementById('inp-workspace').value = CFG.workspaceId;
+  document.getElementById('inp-dataset').value   = CFG.datasetId;
+  document.getElementById('cfg-modal-bg').classList.add('open');
+}
+function closeCfgModal() {
+  document.getElementById('cfg-modal-bg').classList.remove('open');
+}
+function saveConfig() {
+  const tenant    = document.getElementById('inp-tenant').value.trim();
+  const client    = document.getElementById('inp-client').value.trim();
+  const workspace = document.getElementById('inp-workspace').value.trim();
+  const dataset   = document.getElementById('inp-dataset').value.trim();
+
+  if (!tenant || !client || !workspace || !dataset) {
+    showToast('All four fields are required.'); return;
+  }
+
+  sessionStorage.setItem('diq_tenant',    tenant);
+  sessionStorage.setItem('diq_client',    client);
+  sessionStorage.setItem('diq_workspace', workspace);
+  sessionStorage.setItem('diq_dataset',   dataset);
+
+  CFG = { tenantId: tenant, clientId: client, workspaceId: workspace, datasetId: dataset };
+
+  closeCfgModal();
+  msalInstance = buildMsal();
+  msalInstance.initialize().then(() => signIn());
+}
+
+// Close modal on backdrop click
+document.getElementById('cfg-modal-bg').addEventListener('click', e => {
+  if (e.target === document.getElementById('cfg-modal-bg')) closeCfgModal();
+});
+
+/* ─────────────────────────────────────────────────────────────
+   11. BOOT
+─────────────────────────────────────────────────────────────── */
+
+// If config already saved in session, attempt auto sign-in
+// Otherwise fall back to demo data immediately
+window.addEventListener('load', () => {
+  initMsal().catch(() => loadDemoData());
+});
+</script>
 </body>
 </html>
